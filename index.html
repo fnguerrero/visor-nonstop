@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visor /nonstop</title>
+<style>
+  :root {
+    --fondo: #12101f;
+    --panel: #1b1830;
+    --borde: #2e2a4a;
+    --texto: #d8d3ee;
+    --apagado: #8b85ad;
+    --acento: #ffd23f;
+    --ok: #6ee79a;
+    --curso: #4aa8ff;
+    --bloqueado: #ff6b6b;
+    --pendiente: #6b6785;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 28px 32px 60px;
+    background: var(--fondo);
+    color: var(--texto);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+  }
+
+  h1 { font-size: 20px; margin: 0 0 2px; color: var(--acento); }
+  p.sub { margin: 0 0 22px; font-size: 12px; color: var(--apagado); }
+
+  #zona {
+    border: 2px dashed var(--borde);
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    color: var(--apagado);
+    transition: border-color .15s, background .15s;
+    cursor: pointer;
+  }
+  #zona.encima { border-color: var(--acento); background: rgba(255,210,63,.06); }
+  #zona.compacta { padding: 14px; font-size: 12px; }
+  #zona input { display: none; }
+
+  #panel { display: none; margin-top: 24px; }
+  #panel.visible { display: block; }
+
+  .tarjeta {
+    background: var(--panel);
+    border: 1px solid var(--borde);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+
+  .objetivo { color: var(--apagado); font-size: 13px; line-height: 1.6; margin: 6px 0 0; }
+
+  .meta { display: flex; gap: 22px; flex-wrap: wrap; font-size: 12px; color: var(--apagado); margin-top: 12px; }
+  .meta b { color: var(--texto); font-weight: 600; }
+
+  .barra { height: 12px; background: #0d0b1a; border-radius: 6px; overflow: hidden; margin: 14px 0 10px; display: flex; }
+  .barra i { display: block; height: 100%; }
+  .barra .b-hecho { background: var(--ok); }
+  .barra .b-curso { background: var(--curso); }
+  .barra .b-bloq { background: var(--bloqueado); }
+
+  .conteos { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; }
+  .conteos span { display: flex; align-items: center; gap: 6px; }
+  .punto { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .p-hecho { background: var(--ok); }
+  .p-curso { background: var(--curso); }
+  .p-pend { background: var(--pendiente); }
+  .p-bloq { background: var(--bloqueado); }
+
+  .pct { float: right; font-size: 22px; font-weight: 700; color: var(--acento); line-height: 1; }
+
+  h2.seccion {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
+    color: var(--acento); margin: 20px 0 8px; padding-bottom: 4px;
+    border-bottom: 1px solid var(--borde);
+  }
+
+  ul.items { list-style: none; padding: 0; margin: 0; }
+  ul.items li { padding: 5px 0 5px 24px; position: relative; line-height: 1.5; border-bottom: 1px solid rgba(46,42,74,.4); }
+  ul.items li:last-child { border-bottom: 0; }
+  ul.items li::before { position: absolute; left: 2px; top: 5px; font-size: 12px; }
+  li.hecho::before { content: "✓"; color: var(--ok); }
+  li.curso::before { content: "▶"; color: var(--curso); }
+  li.pendiente::before { content: "○"; color: var(--pendiente); }
+  li.bloqueado::before { content: "✕"; color: var(--bloqueado); }
+  li.hecho { color: var(--apagado); }
+  li.bloqueado { color: #ffb3b3; }
+  li.curso { color: #fff; font-weight: 600; }
+  .verif { display: block; font-size: 11px; color: #6b6785; margin-top: 1px; }
+
+  ol.bitacora { list-style: none; padding: 0; margin: 0; font-family: "Courier New", monospace; font-size: 12px; }
+  ol.bitacora li { padding: 4px 0; color: var(--apagado); border-bottom: 1px solid rgba(46,42,74,.4); }
+  ol.bitacora li:last-child { border-bottom: 0; }
+  ol.bitacora b { color: var(--acento); font-weight: 600; }
+
+  .aviso { color: var(--bloqueado); font-size: 12px; margin-top: 10px; }
+  .faltante { color: var(--pendiente); font-size: 12px; margin-top: 6px; }
+
+  /* Batería de tests (?test=1) */
+  #tests { font-family: "Courier New", monospace; font-size: 13px; }
+  #tests .res { display: inline-block; padding: 8px 14px; border-radius: 4px; margin-bottom: 14px; font-size: 15px; }
+  #tests .verde { background: #12351f; color: var(--ok); border: 1px solid #2a6b40; }
+  #tests .rojo { background: #3a1414; color: #ff8f8f; border: 1px solid #7a2a2a; }
+  #tests ul { list-style: none; padding: 0; margin: 0; line-height: 1.7; }
+  #tests li.pasa::before { content: "PASA "; color: var(--ok); }
+  #tests li.falla::before { content: "FALLA "; color: var(--bloqueado); font-weight: bold; }
+  #tests li.falla { color: #ffb3b3; }
+  #tests .extra { color: #6b6785; }
+</style>
+</head>
+<body>
+  <h1>Visor /nonstop</h1>
+  <p class="sub">Arrastrá acá los .md de una carpeta .nonstop/ (SPEC, TODO, BITACORA)</p>
+
+  <div id="zona">
+    Soltá los archivos o hacé click para elegirlos
+    <input type="file" id="archivos" multiple accept=".md,text/markdown">
+  </div>
+
+  <div id="panel"></div>
+
+<script>
+/* Visor de estado de un trabajo /nonstop.
+   Todo el estado vive en `datos`; los parsers lo llenan y `render()` lo pinta.
+   El formato lo genera la propia skill, así que alcanza con parseo por línea. */
+(function () {
+  var datos = { spec: null, todo: null, bitacora: null, ignorados: [] };
+
+  /* ---------------- Parsers ---------------- */
+
+  var ESTADOS = { ' ': 'pendiente', '': 'pendiente', '~': 'curso', 'x': 'hecho', 'X': 'hecho', '!': 'bloqueado' };
+
+  function parsearTodo(txt) {
+    var items = [], secciones = [], seccionActual = 'General';
+    var conteo = { pendiente: 0, curso: 0, hecho: 0, bloqueado: 0, total: 0 };
+
+    txt.split(/\r?\n/).forEach(function (linea) {
+      var mSec = linea.match(/^##\s+(.*?)\s*$/);
+      if (mSec) {
+        seccionActual = mSec[1];
+        if (secciones.indexOf(seccionActual) === -1) secciones.push(seccionActual);
+        return;
+      }
+
+      var mIt = linea.match(/^\s*-\s*\[(.?)\]\s*(.*)$/);
+      if (!mIt) return;
+
+      var estado = ESTADOS[mIt[1]] || 'pendiente';
+      var resto = mIt[2];
+
+      // El texto se corta en el primer " · " que abre verif: o archivos:
+      var verif = null, archivos = null;
+      var mVer = resto.match(/\s+·\s+verif:\s*([^·]*)/i);
+      if (mVer) verif = mVer[1].trim();
+      var mArch = resto.match(/\s+·\s+archivos:\s*([^·]*)/i);
+      if (mArch) archivos = mArch[1].trim();
+      var texto = resto.split(/\s+·\s+(?:verif|archivos):/i)[0].trim();
+
+      if (secciones.indexOf(seccionActual) === -1) secciones.push(seccionActual);
+      items.push({ estado: estado, texto: texto, verif: verif, archivos: archivos, seccion: seccionActual });
+      conteo[estado]++;
+      conteo.total++;
+    });
+
+    var progreso = conteo.total ? Math.round((conteo.hecho / conteo.total) * 100) : 0;
+    return { items: items, secciones: secciones, conteo: conteo, progreso: progreso };
+  }
+
+  function parsearSpec(txt) {
+    var lineas = txt.split(/\r?\n/);
+    var titulo = null, objetivo = [], presupuesto = null;
+    var enObjetivo = false;
+
+    lineas.forEach(function (l) {
+      if (titulo === null) {
+        var mT = l.match(/^#\s+(.*?)\s*$/);
+        if (mT) { titulo = mT[1].replace(/^SPEC\s*[—-]\s*/i, ''); return; }
+      }
+      if (/^##\s+Objetivo\s*$/i.test(l)) { enObjetivo = true; return; }
+      if (enObjetivo && /^##\s+/.test(l)) { enObjetivo = false; return; }
+      if (enObjetivo && l.trim()) objetivo.push(l.trim());
+    });
+
+    // "Máximo **40** iteraciones" en cualquier parte del documento
+    var mP = txt.match(/m[áa]ximo\s+\*\*(\d+)\*\*/i) || txt.match(/presupuesto[\s\S]{0,80}?(\d+)\s*iteraciones/i);
+    if (mP) presupuesto = parseInt(mP[1], 10);
+
+    return { titulo: titulo, objetivo: objetivo.join(' '), presupuesto: presupuesto };
+  }
+
+  function parsearBitacora(txt) {
+    var entradas = [];
+    txt.split(/\r?\n/).forEach(function (l) {
+      var m = l.match(/^#(\d+)\s*[—–-]\s*(.*)$/);
+      if (m) entradas.push({ n: parseInt(m[1], 10), texto: m[2].trim() });
+    });
+    return {
+      entradas: entradas,
+      total: entradas.length,
+      ultima: entradas.length ? entradas[entradas.length - 1].n : null
+    };
+  }
+
+  /* ---------------- Detección ---------------- */
+
+  function detectar(nombre, txt) {
+    var n = (nombre || '').toUpperCase();
+    if (n.indexOf('TODO') >= 0) return 'todo';
+    if (n.indexOf('BITACORA') >= 0 || n.indexOf('BITÁCORA') >= 0) return 'bitacora';
+    if (n.indexOf('SPEC') >= 0) return 'spec';
+
+    // Renombrado: se decide por contenido
+    if (/^\s*-\s*\[.?\]\s+/m.test(txt)) return 'todo';
+    if (/^#\d+\s*[—–-]\s+/m.test(txt)) return 'bitacora';
+    if (/^##\s+(Objetivo|Criterios de aceptaci[óo]n)\s*$/im.test(txt)) return 'spec';
+    return null;
+  }
+
+  /* ---------------- Carga ---------------- */
+
+  /* Acepta {todo:'…', spec:'…'} o [{nombre, texto}, …] */
+  function cargarTextos(entrada) {
+    datos.ignorados = [];
+
+    if (Array.isArray(entrada)) {
+      entrada.forEach(function (f) {
+        var tipo = detectar(f.nombre, f.texto);
+        if (!tipo) { datos.ignorados.push(f.nombre || '(sin nombre)'); return; }
+        aplicar(tipo, f.texto);
+      });
+    } else {
+      Object.keys(entrada).forEach(function (k) {
+        if (entrada[k] != null) aplicar(k, entrada[k]);
+      });
+    }
+
+    render();
+    return estado();
+  }
+
+  function aplicar(tipo, texto) {
+    if (tipo === 'todo') datos.todo = parsearTodo(texto);
+    else if (tipo === 'spec') datos.spec = parsearSpec(texto);
+    else if (tipo === 'bitacora') datos.bitacora = parsearBitacora(texto);
+  }
+
+  function estado() {
+    return {
+      spec: datos.spec,
+      todo: datos.todo,
+      bitacora: datos.bitacora,
+      ignorados: datos.ignorados.slice()
+    };
+  }
+
+  function limpiar() {
+    datos = { spec: null, todo: null, bitacora: null, ignorados: [] };
+    var p = document.getElementById('panel');
+    if (p) { p.className = ''; p.innerHTML = ''; }
+  }
+
+  /* ---------------- Render ---------------- */
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function render() {
+    var panel = document.getElementById('panel');
+    if (!panel) return;
+    if (!datos.todo && !datos.spec && !datos.bitacora) { panel.className = ''; panel.innerHTML = ''; return; }
+
+    var h = '';
+    var t = datos.todo, s = datos.spec, b = datos.bitacora;
+
+    // --- Cabecera ---
+    h += '<div class="tarjeta">';
+    if (t) h += '<span class="pct">' + t.progreso + '%</span>';
+    h += '<h1 style="font-size:17px">' + esc(s && s.titulo ? s.titulo : 'Trabajo sin SPEC cargada') + '</h1>';
+    if (s && s.objetivo) h += '<p class="objetivo">' + esc(s.objetivo) + '</p>';
+
+    h += '<div class="meta">';
+    if (b) {
+      h += '<span>Iteraciones <b>' + b.total + '</b>';
+      if (s && s.presupuesto) h += ' de <b>' + s.presupuesto + '</b>';
+      h += '</span>';
+    }
+    if (t) h += '<span>Ítems <b>' + t.conteo.total + '</b> en <b>' + t.secciones.length + '</b> secciones</span>';
+    h += '</div>';
+
+    if (t && t.conteo.total) {
+      var c = t.conteo, tot = c.total;
+      h += '<div class="barra">' +
+           '<i class="b-hecho" style="width:' + (c.hecho / tot * 100) + '%"></i>' +
+           '<i class="b-curso" style="width:' + (c.curso / tot * 100) + '%"></i>' +
+           '<i class="b-bloq" style="width:' + (c.bloqueado / tot * 100) + '%"></i>' +
+           '</div>';
+      h += '<div class="conteos">' +
+           '<span><i class="punto p-hecho"></i>' + c.hecho + ' hechos</span>' +
+           '<span><i class="punto p-curso"></i>' + c.curso + ' en curso</span>' +
+           '<span><i class="punto p-pend"></i>' + c.pendiente + ' pendientes</span>' +
+           '<span><i class="punto p-bloq"></i>' + c.bloqueado + ' bloqueados</span>' +
+           '</div>';
+    }
+    h += '</div>';
+
+    // --- Ítems por sección ---
+    if (t) {
+      h += '<div class="tarjeta">';
+      t.secciones.forEach(function (sec) {
+        var deSec = t.items.filter(function (i) { return i.seccion === sec; });
+        if (!deSec.length) return;
+        h += '<h2 class="seccion">' + esc(sec) + '</h2><ul class="items">';
+        deSec.forEach(function (i) {
+          h += '<li class="' + i.estado + '">' + esc(i.texto);
+          if (i.verif) h += '<span class="verif">verif: ' + esc(i.verif) + '</span>';
+          h += '</li>';
+        });
+        h += '</ul>';
+      });
+      h += '</div>';
+    }
+
+    // --- Bitácora ---
+    if (b && b.total) {
+      h += '<div class="tarjeta"><h2 class="seccion log">Últimas del log</h2><ol class="bitacora">';
+      b.entradas.slice(-8).forEach(function (e) {
+        h += '<li><b>#' + e.n + '</b> ' + esc(e.texto) + '</li>';
+      });
+      h += '</ol></div>';
+    }
+
+    // --- Avisos ---
+    var faltan = [];
+    if (!datos.spec) faltan.push('SPEC.md');
+    if (!datos.todo) faltan.push('TODO.md');
+    if (!datos.bitacora) faltan.push('BITACORA.md');
+    if (faltan.length) h += '<p class="faltante">Sin cargar: ' + faltan.join(', ') + '</p>';
+    if (datos.ignorados.length) {
+      h += '<p class="aviso">No parecen archivos de .nonstop/, se ignoraron: ' +
+           esc(datos.ignorados.join(', ')) + '</p>';
+    }
+
+    panel.innerHTML = h;
+    panel.className = 'visible';
+    document.getElementById('zona').className = 'compacta';
+  }
+
+  /* ---------------- Drag & drop e input ---------------- */
+
+  function leerArchivos(lista) {
+    var pendientes = [], resultados = [];
+    for (var i = 0; i < lista.length; i++) pendientes.push(lista[i]);
+    if (!pendientes.length) return;
+
+    var restantes = pendientes.length;
+    pendientes.forEach(function (f) {
+      var fr = new FileReader();
+      fr.onload = function () {
+        resultados.push({ nombre: f.name, texto: String(fr.result) });
+        if (--restantes === 0) cargarTextos(resultados);
+      };
+      fr.onerror = function () {
+        resultados.push({ nombre: f.name, texto: '' });
+        if (--restantes === 0) cargarTextos(resultados);
+      };
+      fr.readAsText(f);
+    });
+  }
+
+  function conectarUI() {
+    var zona = document.getElementById('zona');
+    var input = document.getElementById('archivos');
+    if (!zona || !input) return;
+
+    zona.addEventListener('click', function () { input.click(); });
+    input.addEventListener('change', function () { leerArchivos(input.files); });
+
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      zona.addEventListener(ev, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        zona.classList.add('encima');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      zona.addEventListener(ev, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        zona.classList.remove('encima');
+      });
+    });
+    zona.addEventListener('drop', function (e) {
+      if (e.dataTransfer && e.dataTransfer.files) leerArchivos(e.dataTransfer.files);
+    });
+    // Soltar en cualquier parte de la página también vale
+    window.addEventListener('dragover', function (e) { e.preventDefault(); });
+    window.addEventListener('drop', function (e) {
+      e.preventDefault();
+      if (e.target !== zona && e.dataTransfer && e.dataTransfer.files.length) leerArchivos(e.dataTransfer.files);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', conectarUI);
+  } else {
+    conectarUI();
+  }
+
+  /* Ganchos para verificar sin manos. */
+  window.visor = {
+    estado: estado,
+    cargarTextos: cargarTextos,
+    limpiar: limpiar,
+    parsearTodo: parsearTodo,
+    parsearSpec: parsearSpec,
+    parsearBitacora: parsearBitacora,
+    detectar: detectar,
+    leerArchivos: leerArchivos
+  };
+})();
+</script>
+<script>
+/* Batería de tests: se activa con ?test=1. Usa los .md reales de muestras/. */
+(function () {
+  if (!/[?&]test=1/.test(location.search)) return;
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.innerHTML = '<h1>Visor /nonstop — tests</h1>' +
+      '<p class="sub">Batería automática sobre los .md de muestras/</p>' +
+      '<div id="tests"><div class="res" id="res">corriendo…</div><ul id="lista"></ul></div>' +
+      '<div id="zona" style="display:none"><input type="file" id="archivos"></div>' +
+      '<div id="panel"></div>';
+
+    var lista = document.getElementById('lista');
+    var res = document.getElementById('res');
+    var pasaron = 0, fallaron = 0;
+
+    function ok(nombre, cond, extra) {
+      var li = document.createElement('li');
+      li.className = cond ? 'pasa' : 'falla';
+      li.textContent = nombre;
+      if (extra !== undefined && extra !== '') {
+        var s = document.createElement('span');
+        s.className = 'extra';
+        s.textContent = '  ·  ' + extra;
+        li.appendChild(s);
+      }
+      lista.appendChild(li);
+      cond ? pasaron++ : fallaron++;
+    }
+
+    function traer(n) {
+      return fetch('muestras/' + n).then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      });
+    }
+
+    Promise.all([traer('SPEC.md'), traer('TODO.md'), traer('BITACORA.md')]).then(function (m) {
+      var spec = m[0], todo = m[1], bit = m[2];
+      var v = window.visor;
+
+      // --- Parser de TODO ---
+      var t = v.parsearTodo(todo);
+      ok('el TODO real tiene 35 ítems', t.conteo.total === 35, 'total=' + t.conteo.total);
+      ok('los 35 están hechos', t.conteo.hecho === 35, 'hechos=' + t.conteo.hecho);
+      ok('progreso 100%', t.progreso === 100, t.progreso + '%');
+      ok('7 secciones', t.secciones.length === 7, t.secciones.length + ': ' + t.secciones.join(', '));
+      ok('extrae el texto sin el sufijo verif', t.items[0].texto.indexOf('· verif') === -1, t.items[0].texto.slice(0, 40) + '…');
+
+      // --- Estados mezclados ---
+      var mix = v.parsearTodo([
+        '## Uno', '- [x] hecho · verif: algo', '- [~] en curso · archivos: `a.js`',
+        '- [ ] pendiente', '## Dos', '- [!] bloqueado porque sí', '- [x] otro hecho'
+      ].join('\n'));
+      ok('cuenta bien los 4 estados',
+         mix.conteo.hecho === 2 && mix.conteo.curso === 1 && mix.conteo.pendiente === 1 && mix.conteo.bloqueado === 1,
+         JSON.stringify(mix.conteo));
+      ok('progreso parcial correcto', mix.progreso === 40, mix.progreso + '%');
+      ok('captura el campo archivos', mix.items[1].archivos === '`a.js`', String(mix.items[1].archivos));
+      ok('agrupa por sección', mix.secciones.length === 2 && mix.items[3].seccion === 'Dos', mix.secciones.join(', '));
+
+      // --- Parser de SPEC ---
+      var s = v.parsearSpec(spec);
+      ok('lee el presupuesto de la SPEC', s.presupuesto === 40, 'presupuesto=' + s.presupuesto);
+      ok('lee el objetivo', s.objetivo.length > 40, s.objetivo.slice(0, 50) + '…');
+      ok('lee el título', /Plataformero/i.test(s.titulo || ''), String(s.titulo));
+
+      // --- Parser de BITACORA ---
+      var b = v.parsearBitacora(bit);
+      ok('la bitácora real tiene 25 entradas', b.total === 25, 'total=' + b.total);
+      ok('la última es la #24', b.ultima === 24, 'última=#' + b.ultima);
+      ok('cada entrada trae su texto', b.entradas[3].texto.length > 10, b.entradas[3].texto.slice(0, 40) + '…');
+
+      // --- Detección ---
+      ok('detecta por nombre', v.detectar('TODO.md', todo) === 'todo' &&
+         v.detectar('SPEC.md', spec) === 'spec' && v.detectar('BITACORA.md', bit) === 'bitacora');
+      ok('detecta por contenido si está renombrado',
+         v.detectar('a.md', todo) === 'todo' && v.detectar('b.md', bit) === 'bitacora' &&
+         v.detectar('c.md', spec) === 'spec');
+      ok('ignora un archivo que no es de .nonstop/',
+         v.detectar('cualquiera.md', '# Notas\n\nun texto suelto sin nada.') === null);
+
+      // --- Carga en orden invertido + render ---
+      v.limpiar();
+      var e = v.cargarTextos([
+        { nombre: 'BITACORA.md', texto: bit },
+        { nombre: 'TODO.md', texto: todo },
+        { nombre: 'SPEC.md', texto: spec }
+      ]);
+      ok('los 3 se asignan bien en orden invertido',
+         e.todo.conteo.total === 35 && e.spec.presupuesto === 40 && e.bitacora.total === 25);
+
+      var panel = document.getElementById('panel');
+      ok('el panel se hace visible', panel.className === 'visible');
+      ok('el DOM tiene 35 filas de ítem', panel.querySelectorAll('ul.items li').length === 35,
+         'filas=' + panel.querySelectorAll('ul.items li').length);
+      ok('el DOM tiene exactamente 7 secciones de ítems',
+         panel.querySelectorAll('h2.seccion:not(.log)').length === 7,
+         'secciones=' + panel.querySelectorAll('h2.seccion:not(.log)').length);
+      ok('muestra 100%', panel.querySelector('.pct').textContent === '100%',
+         panel.querySelector('.pct').textContent);
+      ok('muestra iteraciones sobre presupuesto', /25/.test(panel.querySelector('.meta').textContent) &&
+         /40/.test(panel.querySelector('.meta').textContent));
+      ok('muestra las últimas 8 del log', panel.querySelectorAll('ol.bitacora li').length === 8,
+         'filas=' + panel.querySelectorAll('ol.bitacora li').length);
+      ok('los ítems hechos llevan su clase', panel.querySelectorAll('li.hecho').length === 35);
+
+      // --- Carga parcial ---
+      v.limpiar();
+      var e2 = v.cargarTextos([{ nombre: 'TODO.md', texto: todo }]);
+      ok('funciona con un solo archivo', e2.todo !== null && e2.spec === null);
+      ok('avisa lo que falta', /SPEC\.md/.test(document.getElementById('panel').textContent));
+
+      // --- Archivo basura ---
+      v.limpiar();
+      var e3 = v.cargarTextos([{ nombre: 'lista-super.md', texto: '# Compras\n\nleche, pan' },
+                               { nombre: 'TODO.md', texto: todo }]);
+      ok('ignora el archivo que no sirve pero procesa el resto',
+         e3.ignorados.length === 1 && e3.todo.conteo.total === 35, e3.ignorados.join(','));
+      ok('avisa del ignorado en pantalla', /lista-super\.md/.test(document.getElementById('panel').textContent));
+
+      // --- Drop simulado ---
+      v.limpiar();
+      try {
+        var dt = new DataTransfer();
+        dt.items.add(new File([todo], 'TODO.md', { type: 'text/markdown' }));
+        v.leerArchivos(dt.files);
+        setTimeout(function () {
+          ok('un drop simulado carga y renderiza',
+             (v.estado().todo || {}).conteo && v.estado().todo.conteo.total === 35);
+          cerrar();
+        }, 120);
+      } catch (err) {
+        ok('un drop simulado carga y renderiza', false, 'DataTransfer no disponible: ' + err.message);
+        cerrar();
+      }
+
+      function cerrar() {
+        res.className = 'res ' + (fallaron === 0 ? 'verde' : 'rojo');
+        res.textContent = fallaron === 0
+          ? '✓ ' + pasaron + '/' + (pasaron + fallaron) + ' tests OK'
+          : '✗ ' + fallaron + ' de ' + (pasaron + fallaron) + ' tests fallaron';
+      }
+    }).catch(function (err) {
+      ok('se pueden leer las muestras', false,
+         'fetch falló (' + err.message + '). La batería necesita servidor: con file:// el navegador bloquea fetch.');
+      res.className = 'res rojo';
+      res.textContent = '✗ no se pudo correr la batería';
+    });
+  });
+})();
+</script>
+</body>
+</html>
