@@ -1,5 +1,7 @@
 # Visor /nonstop
 
+> **Estado: Activo** — en uso para seguir los trabajos largos.
+
 Mira de un vistazo cómo va un trabajo largo de `/nonstop`, sin abrir tres archivos a mano.
 
 ## Uso
